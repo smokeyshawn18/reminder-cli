@@ -15,10 +15,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+
 const (
     envMarkName  = "GOLANG_CLI_REMINDER"
     envMarkValue = "1"
 )
+
+var version = "v1.0.0"
 
 // RunReminderCLI runs the main CLI logic with given args (like os.Args).
 // Returns error instead of exiting, so can be tested and benchmarked.
@@ -81,6 +84,10 @@ func RunReminderCLI(args []string) error {
 }
 
 func main() {
+	    if len(os.Args) > 1 && os.Args[1] == "version" {
+        fmt.Println("Reminder CLI version:", version)
+        return
+    }
     if err := RunReminderCLI(os.Args); err != nil {
         fmt.Println(err)
         os.Exit(1)
