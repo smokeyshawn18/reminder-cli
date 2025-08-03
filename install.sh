@@ -3,7 +3,7 @@
 set -e
 
 REPO="smokeyshawn18/reminder-cli"
-VERSION="v1.0.0"
+VERSION="latest"
 BINARY_NAME="reminder"
 
 echo "📦 Installing $BINARY_NAME from $REPO..."
@@ -44,7 +44,7 @@ ZIP_NAME="reminder-cli-$PLATFORM-$ARCH.zip"
 BIN_NAME="reminder-cli-$PLATFORM-$ARCH"
 
 echo "➡️ Downloading $ZIP_NAME..."
-curl -LO "https://github.com/$REPO/releases/download/$VERSION/$ZIP_NAME"
+curl -LO "https://github.com/$REPO/releases/$VERSION/download/$ZIP_NAME"
 
 echo "📂 Unzipping..."
 unzip -o "$ZIP_NAME"
