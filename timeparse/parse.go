@@ -9,11 +9,10 @@ import (
 	"github.com/olebedev/when/rules/en"
 )
 
-// ParseTime takes a natural language string and returns time.Time or error
+// ParseTime parses natural language time strings into time.Time
 func ParseTime(input string) (time.Time, error) {
     now := time.Now()
     w := when.New(nil)
-    // Add English parsing rules
     w.Add(en.All...)
     w.Add(common.All...)
 
@@ -22,7 +21,7 @@ func ParseTime(input string) (time.Time, error) {
         return time.Time{}, fmt.Errorf("parse error: %w", err)
     }
     if result == nil {
-        return time.Time{}, fmt.Errorf("could not parse time from input: %q", input)
+        return time.Time{}, fmt.Errorf("could not parse time: %q", input)
     }
 
     return result.Time, nil

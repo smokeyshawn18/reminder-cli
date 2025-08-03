@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"time"
-
-	"reminder-cli/db"
 
 	"github.com/gen2brain/beeep"
 )
@@ -17,48 +14,96 @@ const (
     envMarkValue = "1"
 )
 
-// SpawnNotificationProcess launches a child process to run RunReminder with the reminder ID
-func SpawnNotificationProcess(reminderID int) error {
+// SpawnNotificationProcessNoDB spawns a child process passing reminder time and message
+func SpawnNotificationProcessNoDB(reminderTime time.Time, message string) error {
     exePath, err := os.Executable()
     if err != nil {
         return fmt.Errorf("unable to get executable path: %w", err)
     }
 
-    // Pass the environment variable and reminder ID as argument
-    cmd := exec.Command(exePath, envMarkName, strconv.Itoa(reminderID))
+    args := []string{envMarkName, reminderTime.Format(time.RFC3339), message}
+
+    cmd := exec.Command(exePath, args...)
     cmd.Env = append(os.Environ(), envMarkName+"="+envMarkValue)
 
-    // Start the process asynchronously
     if err := cmd.Start(); err != nil {
         return fmt.Errorf("failed to start notification process: %w", err)
     }
     return nil
 }
 
-// RunReminder is run by child process; waits until reminder time and sends notification
-func RunReminder(idStr string) {
-    // Fetch reminder from DB by ID
-    reminder, err := db.GetReminderByID(idStr)
+func RunReminderNoDB(reminderTimeStr string, message string) {
+    remindAt, err := time.Parse(time.RFC3339, reminderTimeStr)
     if err != nil {
-        fmt.Println("Failed to fetch reminder:", err)
+        fmt.Println("Invalid reminder time format:", err)
         os.Exit(1)
     }
 
-    // Sleep until reminder time
-    waitDuration := time.Until(reminder.RemindAt)
-    if waitDuration > 0 {
-        time.Sleep(waitDuration)
+    remaining := time.Until(remindAt)
+    
+    if remaining <= 0 {
+        fmt.Println("Reminder time is in the past or now, sending notification immediately.")
+    } else {
+        fmt.Printf("Successfully set your reminder\n Time remaining: %s\n", formatDurationHHMMSS(remaining))
+        time.Sleep(remaining)
+        fmt.Println("Reminder time reached!")
     }
 
-    // Send desktop notification using beeep
-    iconPath := "assets/information.png" // Optional icon file
-    if err := beeep.Alert("Reminder", reminder.Message, iconPath); err != nil {
+    playBeep()
+
+    iconPath := "assets/information.png"
+    if err := beeep.Alert("Reminder", message, iconPath); err != nil {
         fmt.Println("Failed to send notification:", err)
     }
+}
 
-    // Mark reminder as notified in DB to avoid re-notifying
-    err = db.MarkNotified(reminder.ID)
-    if err != nil {
-        fmt.Println("Warning: failed to update reminder as notified:", err)
+// formatDurationHHMMSS formats a time.Duration as HH:MM:SS
+func formatDurationHHMMSS(d time.Duration) string {
+    d = d.Truncate(time.Second)
+    h := d / time.Hour
+    d -= h * time.Hour
+    m := d / time.Minute
+    d -= m * time.Minute
+    s := d / time.Second
+    return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
+
+// playBeep tries to play a simple beep sound cross platform, with fallbacks
+func playBeep() {
+    // Windows (rundll32 user32.dll,MessageBeep)
+    if isWindows() {
+        exec.Command("rundll32", "user32.dll,MessageBeep").Run()
+        return
     }
+    // Mac: use afplay for Ping sound
+    if isMac() {
+        exec.Command("afplay", "/System/Library/Sounds/Ping.aiff").Run()
+        return
+    }
+    // Linux: try paplay or aplay or terminal bell
+    if isLinux() {
+        if err := exec.Command("paplay", "/usr/share/sounds/freedesktop/stereo/complete.oga").Run(); err == nil {
+            return
+        }
+        if err := exec.Command("aplay", "/usr/share/sounds/alsa/Front_Center.wav").Run(); err == nil {
+            return
+        }
+        // Terminal bell fallback
+        fmt.Print("\a")
+    }
+}
+
+func isWindows() bool {
+    return os.PathSeparator == '\\' && os.PathListSeparator == ';'
+}
+
+func isMac() bool {
+    // OSTYPE not always set; use runtime.GOOS alternatively if needed
+    return os.Getenv("OSTYPE") == "darwin" || os.Getenv("OSTYPE") == "darwin20"
+}
+
+func isLinux() bool {
+    osname := os.Getenv("OSTYPE")
+    return osname == "linux" || osname == "linux-gnu"
 }

@@ -7,14 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"reminder-cli/db"
-	"reminder-cli/device"
 	"reminder-cli/notify"
 	"reminder-cli/timeparse"
 
 	"github.com/joho/godotenv"
 )
-
 
 const (
     envMarkName  = "GOLANG_CLI_REMINDER"
@@ -23,33 +20,24 @@ const (
 
 var version = "v1.0.0"
 
-// RunReminderCLI runs the main CLI logic with given args (like os.Args).
-// Returns error instead of exiting, so can be tested and benchmarked.
+// RunReminderCLI runs the main CLI logic.
+// NOTE: Runs countdown & notification inline blocking the CLI process.
 func RunReminderCLI(args []string) error {
-    // Load .env but not fatal on error
-    if err := godotenv.Load(); err != nil {
-        // Warn, but continue
-        fmt.Println("Warning: .env file not loaded - ensure DATABASE_URL is set in environment")
-    }
+    // Load .env optionally (not needed if no DB)
+    _ = godotenv.Load()
 
-    if err := db.Connect(); err != nil {
-        return fmt.Errorf("DB connection error: %w", err)
-    }
-    defer db.Close()
-
-    if err := db.InitSchema(); err != nil {
-        return fmt.Errorf("DB schema initialization error: %w", err)
-    }
-
+    // If running as child process (the marker is present), run notification and exit
     if os.Getenv(envMarkName) == envMarkValue {
-        if len(args) < 3 {
-            return errors.New("no reminder ID specified for notification process")
+        if len(args) < 4 {
+            return errors.New("not enough arguments for notification process (need time and message)")
         }
-        reminderID := args[2]
-        notify.RunReminder(reminderID)
+        reminderTimeStr := args[2]
+        message := strings.Join(args[3:], " ")
+        notify.RunReminderNoDB(reminderTimeStr, message)
         return nil
     }
 
+    // Normal CLI usage; expect args: <time> <message>
     if len(args) < 3 {
         return fmt.Errorf("usage: %s <time> <message>", args[0])
     }
@@ -65,31 +53,29 @@ func RunReminderCLI(args []string) error {
 
     message := strings.Join(args[2:], " ")
 
-    hostname, osName, arch, username, localIPs, publicIP, err := device.GetDeviceInfo()
-    if err != nil {
-        fmt.Println("Warning: could not get device info:", err)
-    }
+    // === OPTION 1: Run inline countdown & notify (blocks CLI) ===
 
-    id, err := db.SaveReminder(reminderTime, message, publicIP, hostname, osName, arch, username, localIPs)
-    if err != nil {
-        return fmt.Errorf("failed to save reminder: %w", err)
-    }
+    notify.RunReminderNoDB(reminderTime.Format(time.RFC3339), message)
 
-    if err := notify.SpawnNotificationProcess(id); err != nil {
+    // === OPTION 2: Spawn background child process (uncomment if needed) ===
+    /*
+    if err := notify.SpawnNotificationProcessNoDB(reminderTime, message); err != nil {
         return fmt.Errorf("failed to start notification process: %w", err)
     }
 
     fmt.Printf("Reminder set for %s. You will be notified then.\n", reminderTime.Format(time.RFC1123))
+    */
+
     return nil
 }
 
 func main() {
-	    if len(os.Args) > 1 && os.Args[1] == "version" {
+    if len(os.Args) > 1 && os.Args[1] == "version" {
         fmt.Println("Reminder CLI version:", version)
         return
     }
     if err := RunReminderCLI(os.Args); err != nil {
-        fmt.Println(err)
+        fmt.Println("Error:", err)
         os.Exit(1)
     }
 }
