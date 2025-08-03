@@ -3,7 +3,7 @@
 set -e
 
 REPO="smokeyshawn18/reminder-cli"
-VERSION="latest"
+VERSION="v1.0.0"
 BINARY_NAME="reminder"
 
 echo "📦 Installing $BINARY_NAME from $REPO..."
