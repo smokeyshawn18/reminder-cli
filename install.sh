@@ -44,7 +44,7 @@ ZIP_NAME="reminder-cli-$PLATFORM-$ARCH.zip"
 BIN_NAME="reminder-cli-$PLATFORM-$ARCH"
 
 echo "➡️ Downloading $ZIP_NAME..."
-curl -LO "https://github.com/$REPO/releases/$VERSION/download/$ZIP_NAME"
+curl -LO "https://github.com/$REPO/releases/download/$VERSION/$ZIP_NAME"
 
 echo "📂 Unzipping..."
 unzip -o "$ZIP_NAME"
